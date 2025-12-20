@@ -1,0 +1,54 @@
+#!/bin/ash
+set -e
+if [ "$(id -u)" -ne 0 ]; then
+    echo "This script must be run with root privileges."
+    exit 1
+fi
+
+echo "Testing mirrors, this will take a while."
+MIRRORS="https://mirrors.alpinelinux.org/mirrors.txt"
+LOCAL="/etc/apk/repositories"
+ARCH="$(apk --print-arch)"
+
+COMMUNITY=false
+TESTING=false
+VERSION="edge"
+
+while getopts "ctv:" opt; do
+    case "$opt" in
+        c) COMMUNITY=true ;;
+        t) TESTING=true ;;
+        v) VERSION="$OPTARG" ;;
+        *) exit 1 ;;
+    esac
+done
+: > "$LOCAL"
+echo "#/media/sdb/apks/" >> "$LOCAL"
+
+list=""
+for mirror in $(wget -qO- "https://mirrors.alpinelinux.org/mirrors.txt"); do 
+  [ -z "$mirror" ] && continue 
+  printf "%s" "$mirror" 
+
+  result=$(curl -o /dev/null -s -w "%{time_total} %{size_download}" --connect-timeout 5 --max-time 10 "$mirror/$VERSION/main/$ARCH/APKINDEX.tar.gz" 2>/dev/null || echo "999")
+  time=$(echo "$result" | awk '{print $1}')
+  size=$(echo "$result" | awk '{print $2}')
+  
+  if [ -z "$time" ] || [ "$size" -lt 100 ] || [ -z "$size" ]; then
+    time="999"
+  fi
+
+  printf " %s\n" "$time" 
+  list="${list}${time} ${mirror}\n" 
+done
+
+printf "%b" "$list" | sort -n | head -n2 | while read -r _ mirror; do
+    [ -n "$mirror" ] && echo "$mirror/$VERSION/main" >> "$LOCAL"
+done
+
+MASTER="https://dl-cdn.alpinelinux.org/alpine"
+echo "$MASTER/$VERSION/main" >> "$LOCAL"
+$COMMUNITY && echo "$MASTER/$VERSION/community" >> "$LOCAL"
+$TESTING && echo "$MASTER/$VERSION/testing" >> "$LOCAL"
+
+apk update --quiet
