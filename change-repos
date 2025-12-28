@@ -29,7 +29,7 @@ for mirror in $(wget -qO- "https://mirrors.alpinelinux.org/mirrors.txt"); do
   [ -z "$mirror" ] && continue 
   printf "%s" "$mirror" 
 
-  result=$(curl -o /dev/null -s -w "%{time_total} %{size_download}" --connect-timeout 5 --max-time 10 "$mirror/$VERSION/main/$ARCH/APKINDEX.tar.gz" 2>/dev/null || echo "999")
+  result=$(curl -o /dev/null -s -w "%{time_total} %{size_download}" --connect-timeout 5 --max-time 10 "$mirror$VERSION/main/$ARCH/APKINDEX.tar.gz" 2>/dev/null || echo "999")
   time=$(echo "$result" | awk '{print $1}')
   size=$(echo "$result" | awk '{print $2}')
   
